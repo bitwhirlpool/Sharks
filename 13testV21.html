@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>13</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: black;
+            display: flex;
+            flex-direction: column;
+        }
+        #controls {
+            display: flex;
+            align-items: center;
+            padding: 5px 5px;
+            background-color: #ffffff;
+            z-index: 10;
+        }
+        canvas {
+            display: block;
+            flex: 1;
+        }
+        button, input[type="range"] {
+            margin-right: 10px;
+        }
+        label {
+            margin-right: 1px;
+        }
+        span {
+            margin-left: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div id="controls">
+        <button id="bounceButton">Bounce Followers</button>
+        <button id="clearButton">Clear Trail</button>
+        <button id="startButton">Audio</button> 
+        <label for="speedSlider">Follower Speed: </label>
+        <span id="speedValue">4</span>x
+        <input type="range" id="speedSlider" min="1" max="14" value="4" step="1">        
+        <label for="blackCircleSpeedSlider">&nbsp;Big 13 Speed: </label>
+        <span id="blackCircleSpeedValue">4</span>
+        <input type="range" id="blackCircleSpeedSlider" min="1" max="20" value="4" step="1">        
+        <label for="trailDistanceSlider">&nbsp;13 Trail Distance: </label>
+        <span id="trailDistanceValue">150</span> px&nbsp;
+        <input type="range" id="trailDistanceSlider" min="1" max="300" value="150" step="1">
+        
+        <div id="totalsDisplay">Total Followers: 0, Currently Following: 0, Total Collisions: 0</div>
+    </div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        let loopInterval;
+        let isPlaying = false;
+
+        function playNote(frequency, duration) {
+            if (!isPlaying) return;
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration);
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function midiToFrequency(noteNumber) {
+            return 440 * Math.pow(2, (noteNumber - 69) / 12);
+        }
+
+        const notes = [
+        
+      
+        ];
+
+        function playSequence() {
+            if (!isPlaying) return;
+            let totalDuration = 0;
+
+            notes.forEach(({ note, duration, start }) => {
+                setTimeout(() => {
+                    playNote(midiToFrequency(note), duration);
+                }, totalDuration + start);
+            });
+
+            totalDuration += notes[notes.length - 1].start + notes[notes.length - 1].duration;
+            return totalDuration;
+        }
+
+        function startLoop() {
+            if (isPlaying) return;
+            const loopDuration = playSequence();
+            loopInterval = setInterval(playSequence, loopDuration);
+        }
+
+        function stopLoop() {
+            clearInterval(loopInterval);
+        }
+
+        function playCollisionNote() {
+            if (!isPlaying) return;
+            let midiNumber;
+            if (avgCollisionsPer5Seconds <= 10) {
+                midiNumber = [60, 64, 67]; // C Major
+            } else if (avgCollisionsPer5Seconds <= 20) {
+                midiNumber = [61, 65, 68]; // C# Major
+            } else if (avgCollisionsPer5Seconds <= 30) {
+                midiNumber = [62, 66, 69]; // D Major
+            } else if (avgCollisionsPer5Seconds <= 40) {
+                midiNumber = [63, 67, 70]; // D# Major
+            } else if (avgCollisionsPer5Seconds <= 50) {
+                midiNumber = [64, 68, 71]; // E Major
+            } else if (avgCollisionsPer5Seconds <= 60) {
+                midiNumber = [65, 69, 72]; // F Major
+            } else if (avgCollisionsPer5Seconds <= 70) {
+                midiNumber = [66, 70, 73]; // F# Major
+            } else if (avgCollisionsPer5Seconds <= 80) {
+                midiNumber = [67, 71, 74]; // G Major
+            } else if (avgCollisionsPer5Seconds <= 90) {
+                midiNumber = [68, 72, 75]; // G# Major
+            } else if (avgCollisionsPer5Seconds <= 100) {
+                midiNumber = [69, 73, 76]; // A Major
+            } else if (avgCollisionsPer5Seconds <= 110) {
+                midiNumber = [70, 74, 77]; // A# Major
+            } else if (avgCollisionsPer5Seconds <= 120) {
+                midiNumber = [71, 75, 78]; // B Major
+            } else if (avgCollisionsPer5Seconds <= 130) {
+                midiNumber = [82, 86, 89];
+            } else if (avgCollisionsPer5Seconds <= 140) {
+                midiNumber = [70, 74, 77];
+            } else if (avgCollisionsPer5Seconds <= 150) {
+                midiNumber = [72];
+            } else {
+                midiNumber = [36];
+               
+            }
+            midiNumber.forEach(note => {
+                playNote(midiToFrequency(note), 0.1);
+            });
+        }
+
+        let totalCollisions = 0;
+        let startTime = Date.now();
+        let collisionsLast5Seconds = [];
+        let avgCollisionsPer5Seconds = 0;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight - document.getElementById('controls').offsetHeight;
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const masterCircle = { x: canvas.width / 2, y: canvas.height / 2, radius: 30, color: 'red' };
+        const blackCircle = { x: Math.random() * canvas.width, y: Math.random() * canvas.height, radius: 20, color: 'black', speed: 4, direction: Math.random() * 2 * Math.PI, sliding: false, slideDuration: 0, velocityX: 0, velocityY: 0 };
+        const followers = [];
+        const followerCount = 75;
+        const maxFollowerRadius = 20;
+        const minFollowerRadius = 3;
+        const baseDistance = 25;
+        let followSpeed = 4;
+
+        function calculateFollowerSize(x, y) {
+            const distanceX = Math.min(x, canvas.width - x) / (canvas.width / 2);
+            const distanceY = Math.min(y, canvas.height - y) / (canvas.height / 2);
+            const distance = Math.min(distanceX, distanceY);
+            return minFollowerRadius + (maxFollowerRadius - minFollowerRadius) * distance;
+        }
+
+        for (let i = 0; i < followerCount; i += 1) {
+            const x = masterCircle.x;
+            const y = masterCircle.y;
+            followers.push({
+                x: x,
+                y: y,
+                radius: calculateFollowerSize(x, y),
+                color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+                following: true,
+                direction: Math.random() * 2 * Math.PI,
+                speed: followSpeed,
+                sliding: false,
+                slideDuration: 0,
+                velocityX: 0,
+                velocityY: 0
+            });
+        }
+
+        const trails = [];
+        const trailWidth = blackCircle.radius * 0.5;
+        let trailDistance = 150;
+
+        document.getElementById('trailDistanceSlider').addEventListener('input', (event) => {
+            trailDistance = event.target.value;
+            document.getElementById('trailDistanceValue').textContent = event.target.value;
+        });
+
+        document.getElementById('speedSlider').addEventListener('input', (event) => {
+            followSpeed = event.target.value;
+            document.getElementById('speedValue').textContent = event.target.value;
+            followers.forEach(follower => {
+                follower.speed = followSpeed;
+            });
+        });
+
+        document.getElementById('blackCircleSpeedSlider').addEventListener('input', (event) => {
+            blackCircle.speed = event.target.value;
+            document.getElementById('blackCircleSpeedValue').textContent = event.target.value;
+        });
+
+        function updateTrails() {
+            if (trails.length > 0) {
+                const lastTrail = trails[trails.length - 1];
+                const dx = blackCircle.x - lastTrail.x;
+                const dy = blackCircle.y - lastTrail.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance >= trailDistance) {
+                    trails.push({ x: blackCircle.x, y: blackCircle.y });
+                }
+            } else {
+                trails.push({ x: blackCircle.x, y: blackCircle.y });
+            }
+        }
+
+        function drawTrails() {
+            trails.forEach(trail => {
+                ctx.fillStyle = 'black';
+                ctx.beginPath();
+                ctx.arc(trail.x, trail.y, trailWidth, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = 'white';
+                ctx.font = '11px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('13', trail.x, trail.y);
+            });
+        }
+
+        function clearTrails() {
+            trails.length = 0;
+            totalCollisions = 0;
+            startTime = Date.now();
+            collisionsLast5Seconds = [];
+        }
+
+        function checkCollisions() {
+            followers.forEach(follower => {
+                trails.forEach((trail) => {
+                    const dx = follower.x - trail.x;
+                    const dy = follower.y - trail.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < follower.radius + trailWidth) {
+                        const angle = Math.atan2(dy, dx);
+                        follower.sliding = true;
+                        follower.slideDuration = 3;
+                        follower.velocityX = Math.cos(angle) * 10;
+                        follower.velocityY = Math.sin(angle) * 10;
+                        totalCollisions++;
+                        playCollisionNote();
+                        trail.x -= Math.cos(angle) * 20;
+                        trail.y -= Math.sin(angle) * 20;
+                    }
+                });
+            });
+
+            followers.forEach(follower => {
+                const dx = follower.x - blackCircle.x;
+                const dy = follower.y - blackCircle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < follower.radius + blackCircle.radius && !follower.sliding) {
+                    const angle = Math.atan2(dy, dx);
+                    follower.sliding = true;
+                    follower.slideDuration = 3;
+                    follower.velocityX = Math.cos(angle) * 10;
+                    follower.velocityY = Math.sin(angle) * 10;
+                    totalCollisions++;
+                    playCollisionNote();
+                    blackCircle.x -= Math.cos(angle) * 20;
+                    blackCircle.y -= Math.sin(angle) * 20;
+                }
+            });
+
+            trails.forEach((trail, index) => {
+                followers.forEach(follower => {
+                    const dx = follower.x - trail.x;
+                    const dy = follower.y - trail.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < follower.radius + trailWidth) {
+                        totalCollisions++;
+                        playCollisionNote();
+                        const angle = Math.atan2(dy, dx);
+                        trail.x -= Math.cos(angle) * 1;
+                        trail.y -= Math.sin(angle) * 1;
+                    }
+                });
+
+                const dx = masterCircle.x - trail.x;
+                const dy = masterCircle.y - trail.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                if (distance < masterCircle.radius + trailWidth) {
+                    trails.splice(index, 1);
+                }
+            });
+        }
+
+        function update() {
+            let totalFollowing = 0;
+            if (!blackCircle.sliding) {
+                blackCircle.x += Math.cos(blackCircle.direction) * blackCircle.speed;
+                blackCircle.y += Math.sin(blackCircle.direction) * blackCircle.speed;
+                if (blackCircle.x - blackCircle.radius < 0) {
+                    blackCircle.x = blackCircle.radius;
+                    blackCircle.direction = Math.PI - blackCircle.direction + (Math.random() * 0.5 - 0.25);
+                }
+                if (blackCircle.x + blackCircle.radius > canvas.width) {
+                    blackCircle.x = canvas.width - blackCircle.radius;
+                    blackCircle.direction = Math.PI - blackCircle.direction + (Math.random() * 0.5 - 0.25);
+                }
+                if (blackCircle.y - blackCircle.radius < 0) {
+                    blackCircle.y = blackCircle.radius;
+                    blackCircle.direction = -blackCircle.direction + (Math.random() * 0.5 - 0.25);
+                }
+                if (blackCircle.y + blackCircle.radius > canvas.height) {
+                    blackCircle.y = canvas.height - blackCircle.radius;
+                    blackCircle.direction = -blackCircle.direction + (Math.random() * 0.5 - 0.25);
+                }
+            }
+
+                        for (let i = 0; i < followers.length; i += 1) {
+                const follower = followers[i];
+                if (!follower.following) {
+                    const dx = masterCircle.x - follower.x;
+                    const dy = masterCircle.y - follower.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance < masterCircle.radius + follower.radius) {
+                        follower.following = true;
+                        follower.x = masterCircle.x - Math.cos(Math.atan2(dy, dx)) * baseDistance;
+                        follower.y = masterCircle.y - Math.sin(Math.atan2(dy, dx)) * baseDistance;
+                    }
+                }
+                if (follower.following) {
+                    totalFollowing += 1;
+                    const targetX = (i === 0) ? masterCircle.x : followers[i - 1].x;
+                    const targetY = (i === 0) ? masterCircle.y : followers[i - 1].y;
+                    const dx = targetX - follower.x;
+                    const dy = targetY - follower.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    if (distance > 0) {
+                        const angle = Math.atan2(dy, dx);
+                        const moveDistance = Math.min(distance, follower.speed);
+                        follower.x += Math.cos(angle) * moveDistance;
+                        follower.y += Math.sin(angle) * moveDistance;
+                        if (i > 0 && distance < baseDistance) {
+                            follower.x = targetX - Math.cos(angle) * baseDistance;
+                            follower.y = targetY - Math.sin(angle) * baseDistance;
+                        }
+                    }
+                } else {
+                    follower.x += Math.cos(follower.direction) * follower.speed;
+                    follower.y += Math.sin(follower.direction) * follower.speed;
+                    if (follower.x - follower.radius < 0 || follower.x + follower.radius > canvas.width) {
+                        follower.direction = Math.PI - follower.direction;
+                    }
+                    if (follower.y - follower.radius < 0 || follower.y + follower.radius > canvas.height) {
+                        follower.direction = -follower.direction;
+                    }
+                }
+                if (follower.sliding) {
+                    follower.slideDuration -= 1 / 60;
+                    if (follower.slideDuration <= 0) {
+                        follower.sliding = false;
+                        follower.following = true;
+                    } else {
+                        follower.x += follower.velocityX;
+                        follower.y += follower.velocityY;
+                        if (follower.x - follower.radius < 0 || follower.x + follower.radius > canvas.width) {
+                            follower.velocityX = -follower.velocityX;
+                        }
+                        if (follower.y - follower.radius < 0 || follower.y + follower.radius > canvas.height) {
+                            follower.velocityY = -follower.velocityY;
+                        }
+                    }
+                }
+                // Update follower size
+                follower.radius = calculateFollowerSize(follower.x, follower.y);
+            }
+            updateTrails();
+            checkCollisions();
+
+            const currentTime = Date.now();
+            const fiveSecondsAgo = currentTime - 5000;
+            
+            collisionsLast5Seconds.push({time: currentTime, count: totalCollisions});
+            
+            while (collisionsLast5Seconds.length > 0 && collisionsLast5Seconds[0].time < fiveSecondsAgo) {
+                collisionsLast5Seconds.shift();
+            }
+
+            if (collisionsLast5Seconds.length > 1) {
+                const oldestCount = collisionsLast5Seconds[0].count;
+                const newestCount = collisionsLast5Seconds[collisionsLast5Seconds.length - 1].count;
+                avgCollisionsPer5Seconds = (newestCount - oldestCount) / 5;
+            }
+
+            document.getElementById('totalsDisplay').textContent = 
+                `Total: ${followers.length}, Following: ${totalFollowing}, ` +
+                `Total Collisions: ${totalCollisions} 
+                (${avgCollisionsPer5Seconds.toFixed(0)}/s)`;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = masterCircle.color;
+            ctx.beginPath();
+            ctx.arc(masterCircle.x, masterCircle.y, masterCircle.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = blackCircle.color;
+            ctx.beginPath();
+            ctx.arc(blackCircle.x, blackCircle.y, blackCircle.radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            const angle = performance.now() / 1000;
+            ctx.save();
+            ctx.translate(blackCircle.x, blackCircle.y);
+            ctx.rotate(angle);
+            ctx.fillStyle = 'white';
+            ctx.font = '30px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('13', 0, 0);
+            ctx.restore();
+
+            for (const follower of followers) {
+                ctx.fillStyle = follower.following ? 'red' : follower.color;
+                ctx.beginPath();
+                ctx.arc(follower.x, follower.y, follower.radius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            drawTrails();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('startButton').addEventListener('click', () => {
+            audioContext.resume().then(() => {
+                if (!isPlaying) {
+                    startLoop();
+                    isPlaying = true;
+                    document.getElementById('startButton').textContent = 'Mute';
+                } else {
+                    stopLoop();
+                    isPlaying = false;
+                    document.getElementById('startButton').textContent = 'Audio';
+                }
+            });
+        });
+
+        document.getElementById('clearButton').addEventListener('click', clearTrails);
+        canvas.addEventListener('mousemove', (event) => {
+            masterCircle.x = event.clientX;
+            masterCircle.y = event.clientY - document.getElementById('controls').offsetHeight;
+        });
+        
+        document.getElementById('bounceButton').addEventListener('click', () => {
+            for (const follower of followers) {
+                follower.following = false;
+                follower.direction = Math.random() * 2 * Math.PI;
+                follower.speed = Math.random() * 2 + 2;
+                follower.color = 'blue';
+                follower.x = Math.random() * canvas.width;
+                follower.y = Math.random() * canvas.height;
+            }
+            totalCollisions = 0;
+            startTime = Date.now();
+            collisionsLast5Seconds = [];
+            update();
+        });
+        canvas.addEventListener('touchmove', (event) => {
+            const touch = event.touches[0];
+            masterCircle.x = touch.clientX;
+            masterCircle.y = touch.clientY - document.getElementById('controls').offsetHeight;
+            event.preventDefault();
+        });
+
+        gameLoop();
+    </script>
+</body>
+</html>
