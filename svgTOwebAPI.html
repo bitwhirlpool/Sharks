@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG to Canvas Converter</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG to Canvas Converter</h1>
+    <textarea id="svgInput" rows="10" cols="50" placeholder="Paste your SVG code here..."></textarea><br>
+    <button id="convertButton">Convert SVG to Canvas</button>
+    
+    <h2>Canvas Output:</h2>
+    <canvas id="canvas" width="500" height="300"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        document.getElementById('convertButton').addEventListener('click', () => {
+            const svgText = document.getElementById('svgInput').value;
+            convertSVGToCanvas(svgText, ctx);
+        });
+
+        function convertSVGToCanvas(svgText, ctx) {
+            // Clear the canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Create a DOM parser to parse the SVG
+            const parser = new DOMParser();
+            const svgDoc = parser.parseFromString(svgText, "image/svg+xml");
+            
+            // Check for parsing errors
+            const parseError = svgDoc.getElementsByTagName('parsererror');
+            if (parseError.length) {
+                console.error('Error parsing SVG:', parseError[0].textContent);
+                return;
+            }
+
+            const svgElements = svgDoc.documentElement.children;
+
+            // Loop through SVG elements and draw them on the canvas
+            for (let i = 0; i < svgElements.length; i++) {
+                const element = svgElements[i];
+
+                switch (element.tagName) {
+                    case 'rect':
+                        drawRect(ctx, element);
+                        break;
+                    case 'circle':
+                        drawCircle(ctx, element);
+                        break;
+                    case 'line':
+                        drawLine(ctx, element);
+                        break;
+                    case 'ellipse':
+                        drawEllipse(ctx, element);
+                        break;
+                    case 'polygon':
+                        drawPolygon(ctx, element);
+                        break;
+                    case 'polyline':
+                        drawPolyline(ctx, element);
+                        break;
+                    case 'path':
+                        drawPath(ctx, element);
+                        break;
+                    default:
+                        console.warn(`Unsupported SVG element: ${element.tagName}`);
+                }
+            }
+        }
+
+        function drawRect(ctx, element) {
+            const x = parseFloat(element.getAttribute('x')) || 0;
+            const y = parseFloat(element.getAttribute('y')) || 0;
+            const width = parseFloat(element.getAttribute('width')) || 0;
+            const height = parseFloat(element.getAttribute('height')) || 0;
+            const fill = element.getAttribute('fill') || 'black';
+
+            ctx.fillStyle = fill;
+            ctx.fillRect(x, y, width, height);
+        }
+
+        function drawCircle(ctx, element) {
+            const cx = parseFloat(element.getAttribute('cx')) || 0;
+            const cy = parseFloat(element.getAttribute('cy')) || 0;
+            const r = parseFloat(element.getAttribute('r')) || 0;
+            const fill = element.getAttribute('fill') || 'black';
+
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawLine(ctx, element) {
+            const x1 = parseFloat(element.getAttribute('x1')) || 0;
+            const y1 = parseFloat(element.getAttribute('y1')) || 0;
+            const x2 = parseFloat(element.getAttribute('x2')) || 0;
+            const y2 = parseFloat(element.getAttribute('y2')) || 0;
+            const stroke = element.getAttribute('stroke') || 'black';
+            const strokeWidth = parseFloat(element.getAttribute('stroke-width')) || 1;
+
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = strokeWidth;
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+        }
+
+        function drawEllipse(ctx, element) {
+            const cx = parseFloat(element.getAttribute('cx')) || 0;
+            const cy = parseFloat(element.getAttribute('cy')) || 0;
+            const rx = parseFloat(element.getAttribute('rx')) || 0;
+            const ry = parseFloat(element.getAttribute('ry')) || 0;
+            const fill = element.getAttribute('fill') || 'black';
+
+            ctx.fillStyle = fill;
+            ctx.beginPath();
+            ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawPolygon(ctx, element) {
+            const points = element.getAttribute('points').trim().split(' ').map(point => point.split(',').map(Number));
+            ctx.fillStyle = element.getAttribute('fill') || 'black';
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            points.forEach(point => {
+                ctx.lineTo(point[0], point[1]);
+            });
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawPolyline(ctx, element) {
+            const points = element.getAttribute('points').trim().split(' ').map(point => point.split(',').map(Number));
+            ctx.strokeStyle = element.getAttribute('stroke') || 'black';
+            ctx.lineWidth = parseFloat(element.getAttribute('stroke-width')) || 1;
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            points.forEach(point => {
+                ctx.lineTo(point[0], point[1]);
+            });
+            ctx.stroke();
+        }
+
+        function drawPath(ctx, element) {
+            const pathData = element.getAttribute('d');
+            const fill = element.getAttribute('fill') || 'black';
+            const stroke = element.getAttribute('stroke') || 'black';
+            const strokeWidth = parseFloat(element.getAttribute('stroke-width')) || 1;
+
+            const path = new Path2D(pathData);
+            ctx.fillStyle = fill;
+            ctx.fill(path);
+            ctx.strokeStyle = stroke;
+            ctx.lineWidth = strokeWidth;
+            ctx.stroke(path);
+        }
+    </script>
+</body>
+</html>
