@@ -24,3 +24,12 @@ Information:
 Total followers 
 Total Following (currently) 
 Total Collisions + (collisions per second) // used to change sound effects
+
+Fun Fact:
+The breaking wave animation is made with 26,000 13 sided polygons
+
+Geek Speak: 
+In the code the leader is refered to as Master Circle and the Big rotating 13 is referred to as Black Circle.
+
+
+
