@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI to Web Audio API Code Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: monospace;
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+    <h1>MIDI to Web Audio API Code Generator</h1>
+    <input type="file" id="midiFile" accept=".mid, .midi">
+    <button id="generateButton">Generate Web Audio API Code</button>
+    <button id="playButton" disabled>Play MIDI</button>
+    <h2>Generated Code:</h2>
+    <textarea id="outputCode" readonly></textarea>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi"></script>
+    <script>
+        const generateButton = document.getElementById('generateButton');
+        const playButton = document.getElementById('playButton');
+        const midiFileInput = document.getElementById('midiFile');
+        const outputCode = document.getElementById('outputCode');
+
+        let midiData = null; // Store the MIDI data for playback
+
+        generateButton.addEventListener('click', async () => {
+            const file = midiFileInput.files[0];
+            if (!file) {
+                alert('Please select a MIDI file.');
+                return;
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            midiData = new Midi(arrayBuffer); // Store the parsed MIDI data
+
+            // Start building the Web Audio API code
+            let code = `
+const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+function playNote(frequency, duration) {
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.type = 'sine'; // Change wave type if needed
+    oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+    gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // Volume
+    gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration); // Fade out
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration);
+}
+
+function midiToFrequency(noteNumber) {
+    return 440 * Math.pow(2, (noteNumber - 69) / 12);
+}
+`;
+
+            // Generate code for each note
+            midiData.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    const frequency = `midiToFrequency(${note.midi})`;
+                    const duration = note.duration; // Duration in seconds
+                    const startTime = note.time; // Start time in seconds
+
+                    // Add the note scheduling code
+                    code += `
+setTimeout(() => {
+    playNote(${frequency}, ${duration});
+}, ${startTime * 1000}); // Start time in milliseconds
+`;
+                });
+            });
+
+            // Display the generated code
+            outputCode.value = code.trim();
+            playButton.disabled = false; // Enable the play button
+        });
+
+        playButton.addEventListener('click', () => {
+            if (!midiData) {
+                alert('No MIDI data available. Please generate the code first.');
+                return;
+            }
+
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            // Function to play a note
+            function playNote(frequency, duration) {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.type = 'sine'; // Change wave type if needed
+                oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+                gainNode.gain.setValueAtTime(0.1, audioContext.currentTime); // Volume
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime + duration); // Fade out
+
+                oscillator.start();
+                oscillator.stop(audioContext.currentTime + duration);
+            }
+
+            // Convert MIDI note numbers to frequencies
+            function midiToFrequency(noteNumber) {
+                return 440 * Math.pow(2, (noteNumber - 69) / 12);
+            }
+
+            // Schedule the notes to play
+            midiData.tracks.forEach(track => {
+                track.notes.forEach(note => {
+                    const frequency = midiToFrequency(note.midi);
+                    const duration = note.duration; // Duration in seconds
+                    const startTime = note.time; // Start time in seconds
+
+                    // Schedule the note to play
+                    setTimeout(() => {
+                        playNote(frequency, duration);
+                    }, startTime * 1000); // Convert to milliseconds
+                });
+            });
+        });
+    </script>
+</body>
+</html>
